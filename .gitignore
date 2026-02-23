@@ -1,0 +1,39 @@
+# ==========================================
+# BACKEND (Python / FastAPI / MACE Engine)
+# ==========================================
+
+# Environments & Secrets
+backend/.env
+backend/venv/
+backend/env/
+backend/auth_tokens.db
+
+# Python Bytecode & Cache
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/*$py.class
+
+# IDE / OS Specific
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# FRONTEND 
+# ==========================================
+
+# Dependencies
+
+
+# Production builds
+
+
+# Logs
+
+
+# ==========================================
+# DATA & ASSETS
+# ==========================================
+
+# Ignore all raw data files or large datasets
