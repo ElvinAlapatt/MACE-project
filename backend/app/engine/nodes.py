@@ -1,16 +1,16 @@
-import random
-from typing import Literal
+from langchain_ollama import ChatOllama
+from .prompts import CODER_PROMPT
+from .state import MACEState
 
-def node1(state):
-    return({"graph_state":state['graph_state'] + "I am"})
+#initialising the models
+coder_slm = ChatOllama(model="qwen2.5-coder:7b", temperature=0)
 
-def node2(state):
-    return({"graph_state":state['graph_state'] + " Happy"})
+def coding_node(state : MACEState):
 
-def node3(state):
-    return({"graph_state":state['graph_state'] + " Sad"})
+    response = coder_slm.invoke([("system",CODER_PROMPT)] + state["messages"])
+    return {
+        "code" : response.content,
+        "iteration_count" : state["iteration_count"] + 1,
+        "messages" : [response.content]
+    }
 
-def decision_mood(state) -> Literal["node_2","node_3"]:
-    if random.random() < 0.5:
-        return "node_2"
-    return "node_3"
