@@ -1,10 +1,15 @@
-from typing import TypedDict , Annotated ,List
+from typing import Annotated , TypedDict
 import operator
 
 class MACEState(TypedDict):
-    messages : Annotated[List[str], operator.add]
-    code : str
-    feedback : str  
-    docs : str 
-    iteration_count : int 
-    current_agent : str 
+    user_request : str
+    generated_code : str
+    messages : Annotated[list,operator.add]
+
+    qa_feedback : str
+    qa_status : str
+    retry_count : int
+    max_retries : int
+    test_results : str
+
+    
