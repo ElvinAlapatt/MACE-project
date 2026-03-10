@@ -6,22 +6,18 @@ from .nodes import coder_node , qa_node , coder_retry_node
 
 
 def should_retry_or_end(state: MACEState) -> str:
-    """
-    The brain of the loop. Called after every QA run.
-    Returns a string that tells LangGraph which edge to follow.
-    
-    This is a CONDITIONAL EDGE FUNCTION.
-    It must return one of the keys defined in add_conditional_edges below.
-    """
     if state["qa_status"] == "pass":
-        print("\n✅ [ORCHESTRATOR] QA passed. Moving to END.")
+        print("\n✅ [ORCHESTRATOR] QA passed.")
         return "approved"
     
+    if state["qa_status"] == "impossible":
+        print("\n🚫 [ORCHESTRATOR] Task is impossible. Stopping early.")
+        return "max_retries_reached"   # exits cleanly
+    
     if state["retry_count"] >= state["max_retries"]:
-        print(f"\n⛔ [ORCHESTRATOR] Max retries ({state['max_retries']}) reached. Stopping.")
+        print(f"\n⛔ [ORCHESTRATOR] Max retries reached.")
         return "max_retries_reached"
     
-    print(f"\n🔁 [ORCHESTRATOR] QA failed. Sending back to Coder. (Attempt {state['retry_count'] + 1}/{state['max_retries']})")
     return "retry"
 
 
