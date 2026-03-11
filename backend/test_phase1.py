@@ -53,9 +53,10 @@ if __name__ == "__main__":
     withdraw, get_balance methods. Withdraw must raise ValueError 
     if amount exceeds balance. Demo all methods at the bottom.""")
 
+
     # Should detect IMPOSSIBLE early
     test_mace("""Write a Python script that imports dataforge 
     and uses dataforge.transform() on [1,2,3,4,5]""")
 
     # Test 2: Try something more complex
-    # test_mace("Write a function that finds the fibonacci sequence up to n terms")
+    test_mace("Write a function that finds the fibonacci sequence up to n terms")

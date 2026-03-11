@@ -4,32 +4,61 @@ from .state import MACEState
 from .prompts import CODER_SYSTEM_PROMPT, QA_SYSTEM_PROMPT, CODER_RETRY_PROMPT
 from .utils import extract_code, run_code_safely
 import re
+import os
+from dotenv import load_dotenv
 
-# Initialize the model ONCE at module level (not inside the function)
-# This avoids re-creating the connection on every single call
-coder_llm = ChatOllama(
-    model="qwen2.5-coder:7b",
-    temperature=0.2,
-    num_ctx=2048,
-    num_gpu=20,
-    base_url="http://localhost:11434"
-)
+load_dotenv()
 
-qa_llm = ChatOllama(
-    model="deepseek-r1:8b",
-    temperature=0.1,
-    num_ctx=2048,
-    num_gpu=20,
-    base_url="http://localhost:11434"
-)
+USE_GROQ = os.getenv("USE_GROQ", "false").lower() == "true"
+
+if USE_GROQ:
+    from langchain_groq import ChatGroq
+    print("⚡ [MACE] Using Groq cloud models")
+
+    coder_llm = ChatGroq(
+        model="qwen/qwen3-32b",
+        temperature=0.2,
+        api_key=os.getenv("GROQ_API_KEY")
+    )
+    qa_llm = ChatGroq(
+        model="llama-3.3-70b-versatile",
+        temperature=0.1,
+        api_key=os.getenv("GROQ_API_KEY")
+    )
+else:
+    print("🖥️  [MACE] Using local Ollama models")
+
+    coder_llm = ChatOllama(
+        model="qwen2.5-coder:7b",
+        temperature=0.2,
+        num_ctx=2048,
+        num_gpu=20,
+        base_url="http://localhost:11434"
+    )
+    qa_llm = ChatOllama(
+        model="deepseek-r1:8b",
+        temperature=0.1,
+        num_ctx=2048,
+        num_gpu=20,
+        base_url="http://localhost:11434"
+    )
 
 
 def parse_qa_response(raw: str) -> str:
-    # deepseek-r1 always ends with content after </think>
+    """
+    Handles different response formats:
+    - Groq models: clean direct response
+    - deepseek-r1: answer buried in <think> blocks
+    """
     if "</think>" in raw:
         after_think = raw.split("</think>")[-1].strip()
         if after_think:
             return after_think
+
+    inside = re.sub(r"</?think>", "", raw, flags=re.DOTALL).strip()
+    if inside:
+        return inside
+
     return raw.strip()
 
 
@@ -102,19 +131,17 @@ Provide your STATUS and FEEDBACK.
 
     response = qa_llm.invoke(messages)
 
-    # Step 4: Parse deepseek-r1 response correctly
-    # The model sometimes puts its answer inside <think>, sometimes after it
+    # Step 4: Parse response — handles both Groq and deepseek-r1 formats
     qa_response = parse_qa_response(response.content)
 
-    # Step 5: Parse STATUS — order matters, check IMPOSSIBLE before FAIL
-    qa_status = "fail"  # safe default
+    # Step 5: Parse STATUS — order matters
+    qa_status = "fail"
     if qa_response:
         if "STATUS: PASS" in qa_response.upper():
             qa_status = "pass"
         elif "STATUS: IMPOSSIBLE" in qa_response.upper():
             qa_status = "impossible"
     else:
-        # Model returned nothing useful — fail with a clear message
         qa_response = "STATUS: FAIL\nFEEDBACK: QA agent returned empty response. Please retry."
         print("⚠️  [QA AGENT] Warning: Empty response from model")
 
@@ -133,7 +160,6 @@ Provide your STATUS and FEEDBACK.
 def coder_retry_node(state: MACEState) -> MACEState:
     """
     The Coder agent in retry mode.
-    Knows about its previous failure and QA feedback.
 
     Reads:  state['user_request'], state['generated_code'],
             state['qa_feedback'], state['retry_count']
