@@ -1,7 +1,7 @@
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from .state import MACEState
-from .prompts import CODER_SYSTEM_PROMPT, QA_SYSTEM_PROMPT, CODER_RETRY_PROMPT
+from .prompts import CODER_SYSTEM_PROMPT, QA_SYSTEM_PROMPT, CODER_RETRY_PROMPT, DOCUMENTARIAN_SYSTEM_PROMPT
 from .utils import extract_code, run_code_safely
 import re
 import os
@@ -25,6 +25,11 @@ if USE_GROQ:
         temperature=0.1,
         api_key=os.getenv("GROQ_API_KEY")
     )
+    doc_llm = ChatGroq(
+        model="llama-3.3-70b-versatile",   # same as QA — good at structured writing
+        temperature=0.3,                    # slightly higher = more natural writing
+        api_key=os.getenv("GROQ_API_KEY")
+    )
 else:
     print("🖥️  [MACE] Using local Ollama models")
 
@@ -38,6 +43,13 @@ else:
     qa_llm = ChatOllama(
         model="deepseek-r1:8b",
         temperature=0.1,
+        num_ctx=2048,
+        num_gpu=20,
+        base_url="http://localhost:11434"
+    )
+    doc_llm = ChatOllama(
+        model="qwen2.5-coder:7b",          # reuse coder model locally
+        temperature=0.3,
         num_ctx=2048,
         num_gpu=20,
         base_url="http://localhost:11434"
@@ -191,5 +203,41 @@ Please fix the code based on this feedback.
     return {
         "generated_code": response.content,
         "retry_count": new_retry_count,
+        "messages": [response]
+    }
+
+def documentarian_node(state: MACEState) -> MACEState:
+    """
+    The Technical Documentarian agent.
+    Only runs after QA has approved the code.
+
+    Reads:  state['generated_code'], state['user_request']
+    Writes: state['documentation']
+    """
+    print("\n📝 [DOCUMENTARIAN] Generating documentation...")
+
+    # Extract clean code — same as QA does
+    raw_code = extract_code(state["generated_code"])
+
+    messages = [
+        SystemMessage(content=DOCUMENTARIAN_SYSTEM_PROMPT),
+        HumanMessage(content=f"""
+ORIGINAL TASK:
+{state["user_request"]}
+
+APPROVED CODE:
+{raw_code}
+
+Generate the markdown documentation for this code.
+        """)
+    ]
+
+    response = doc_llm.invoke(messages)
+    documentation = response.content
+
+    print("📝 [DOCUMENTARIAN] Documentation complete.")
+
+    return {
+        "documentation": documentation,
         "messages": [response]
     }
