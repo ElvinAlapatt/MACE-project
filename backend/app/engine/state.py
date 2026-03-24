@@ -13,3 +13,6 @@ class MACEState(TypedDict):
     test_results : str
 
     documentation: str 
+
+    memory_context: str
+    failure_feedback: str

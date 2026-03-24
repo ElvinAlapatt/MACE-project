@@ -6,54 +6,30 @@ from .utils import extract_code, run_code_safely
 import re
 import os
 from dotenv import load_dotenv
+from .memory import init_db , store_run , get_relevant_memory
+
+init_db()
 
 load_dotenv()
 
-USE_GROQ = os.getenv("USE_GROQ", "false").lower() == "true"
+from langchain_groq import ChatGroq
+print("⚡ [MACE] Using Groq cloud models")
 
-if USE_GROQ:
-    from langchain_groq import ChatGroq
-    print("⚡ [MACE] Using Groq cloud models")
-
-    coder_llm = ChatGroq(
-        model="qwen/qwen3-32b",
-        temperature=0.2,
-        api_key=os.getenv("GROQ_API_KEY")
-    )
-    qa_llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.1,
-        api_key=os.getenv("GROQ_API_KEY")
-    )
-    doc_llm = ChatGroq(
-        model="llama-3.3-70b-versatile",   # same as QA — good at structured writing
-        temperature=0.3,                    # slightly higher = more natural writing
-        api_key=os.getenv("GROQ_API_KEY")
-    )
-else:
-    print("🖥️  [MACE] Using local Ollama models")
-
-    coder_llm = ChatOllama(
-        model="qwen2.5-coder:7b",
-        temperature=0.2,
-        num_ctx=2048,
-        num_gpu=20,
-        base_url="http://localhost:11434"
-    )
-    qa_llm = ChatOllama(
-        model="deepseek-r1:8b",
-        temperature=0.1,
-        num_ctx=2048,
-        num_gpu=20,
-        base_url="http://localhost:11434"
-    )
-    doc_llm = ChatOllama(
-        model="qwen2.5-coder:7b",          # reuse coder model locally
-        temperature=0.3,
-        num_ctx=2048,
-        num_gpu=20,
-        base_url="http://localhost:11434"
-    )
+coder_llm = ChatGroq(
+    model="qwen/qwen3-32b",
+    temperature=0.2,
+    api_key=os.getenv("GROQ_API_KEY")
+)
+qa_llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0.1,
+    api_key=os.getenv("GROQ_API_KEY")
+)
+doc_llm = ChatGroq(
+    model="llama-3.3-70b-versatile",   # same as QA — good at structured writing
+    temperature=0.3,                    # slightly higher = more natural writing
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 
 def parse_qa_response(raw: str) -> str:
@@ -77,24 +53,40 @@ def parse_qa_response(raw: str) -> str:
 def coder_node(state: MACEState) -> MACEState:
     """
     The Lead Developer agent.
-
-    Reads:  state['user_request']
-    Writes: state['generated_code'], state['messages']
+    Now reads past lessons before generating.
     """
     print("\n🧑‍💻 [CODER AGENT] Received task:", state["user_request"])
 
+    # Read memory — what has MACE learned from past failures?
+    memory_context = get_relevant_memory(state["user_request"])
+
+    if memory_context:
+        print("🧠 [CODER AGENT] Loaded past lessons from memory.")
+        user_message = f"""Write Python code for the following task:
+
+TASK:
+{state['user_request']}
+
+{memory_context}
+
+Apply these lessons to avoid repeating past mistakes.
+"""
+    else:
+        print("🧠 [CODER AGENT] No past lessons found. Starting fresh.")
+        user_message = f"Write Python code for the following task:\n\n{state['user_request']}"
+
     messages = [
         SystemMessage(content=CODER_SYSTEM_PROMPT),
-        HumanMessage(content=f"Write Python code for the following task:\n\n{state['user_request']}")
+        HumanMessage(content=user_message)
     ]
 
     print("🧑‍💻 [CODER AGENT] Generating code...")
     response = coder_llm.invoke(messages)
-
     print("🧑‍💻 [CODER AGENT] Done. Code generated.")
 
     return {
         "generated_code": response.content,
+        "memory_context": memory_context,
         "messages": messages + [response]
     }
 
@@ -161,28 +153,28 @@ Provide your STATUS and FEEDBACK.
     if qa_status != "pass":
         print(f"🔍 [QA AGENT] Feedback: {qa_response}")
 
-    return {
+    # At the end of qa_node, update the return:
+    return_data = {
         "qa_status": qa_status,
         "qa_feedback": qa_response,
         "test_results": test_summary,
         "messages": [response]
     }
 
+    # Only store failure feedback — don't overwrite with pass verdicts
+    if qa_status in ["fail", "impossible"]:
+        return_data["failure_feedback"] = qa_response
+
+    return return_data
+
 
 def coder_retry_node(state: MACEState) -> MACEState:
-    """
-    The Coder agent in retry mode.
-
-    Reads:  state['user_request'], state['generated_code'],
-            state['qa_feedback'], state['retry_count']
-    Writes: state['generated_code'], state['retry_count']
-    """
     new_retry_count = state["retry_count"] + 1
     print(f"\n🔄 [CODER RETRY] Attempt {new_retry_count} of {state['max_retries']}...")
 
-    messages = [
-        SystemMessage(content=CODER_RETRY_PROMPT),
-        HumanMessage(content=f"""
+    memory_context = state.get("memory_context", "")
+
+    content = f"""
 ORIGINAL TASK:
 {state["user_request"]}
 
@@ -191,13 +183,18 @@ YOUR PREVIOUS CODE:
 
 QA FEEDBACK:
 {state["qa_feedback"]}
+"""
+    if memory_context:
+        content += f"\n{memory_context}\n"
 
-Please fix the code based on this feedback.
-        """)
+    content += "\nPlease fix the code addressing all feedback above."
+
+    messages = [
+        SystemMessage(content=CODER_RETRY_PROMPT),
+        HumanMessage(content=content)
     ]
 
     response = coder_llm.invoke(messages)
-
     print(f"🔄 [CODER RETRY] New code generated.")
 
     return {
@@ -241,3 +238,18 @@ Generate the markdown documentation for this code.
         "documentation": documentation,
         "messages": [response]
     }
+
+def memory_node(state: MACEState) -> MACEState:
+    print("\n🧠 [MEMORY] Storing run and updating lessons...")
+
+    store_run(
+        task=state["user_request"],
+        final_code=state["generated_code"],
+        qa_status=state["qa_status"],
+        retry_count=state["retry_count"],
+        documentation=state.get("documentation", ""),
+        qa_feedback=state.get("failure_feedback", "")  # ← use failure_feedback
+    )
+
+    print("🧠 [MEMORY] Done. Memory updated.")
+    return {}

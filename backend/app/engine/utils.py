@@ -43,7 +43,8 @@ def run_code_safely(code : str) -> dict:
     with tempfile.NamedTemporaryFile(
         mode='w',
         suffix='.py',
-        delete=False  
+        delete=False,
+        encoding='utf-8' 
     ) as f:
         f.write(code)
         temp_path = f.name
