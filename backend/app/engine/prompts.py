@@ -21,6 +21,9 @@ RULES:
 - Always include basic error handling where relevant  
 - Write code that can actually be run immediately
 - NEVER repeat mistakes listed in past lessons
+- NEVER add commented-out example usage code at the bottom
+- NEVER add if __name__ == "__main__" blocks unless explicitly asked
+- Output ONLY the core implementation, nothing else
 
 SANDBOX RULES — NEVER VIOLATE:
 - NEVER use input() — code runs in automated sandbox, no keyboard

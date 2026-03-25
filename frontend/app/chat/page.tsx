@@ -1,17 +1,17 @@
 "use client";
-
+import ReactMarkdown from "react-markdown";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import remarkGfm from "remark-gfm";
 
 export default function ChatPage() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<{ role: string; content: any }[]>([]);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
 
-  // 1. Create a ref for the bottom of the chat
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadingMessages = [
@@ -21,12 +21,10 @@ export default function ChatPage() {
     "Orchestrator is finalizing the build..."
   ];
 
-  // 2. Function to scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 3. Trigger scroll whenever messages or loading state changes
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading, loadingStep]);
@@ -43,34 +41,59 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!prompt.trim() || isLoading) return;
 
-    const newMessages = [...messages, { role: "user", content: prompt }];
-    setMessages(newMessages);
+    const userPrompt = prompt;
+    setMessages(prev => [...prev, { role: "user", content: userPrompt }]);
     setPrompt("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "MACE",
-          content: {
-            code: "def main():\n    # MACE Generated Logic\n    print('System initialized')\n    return True",
-            feedback: "All systems green. Optimization score: 98%.",
-            document: "Build Version: 1.0.4\nEnvironment: Production-ready"
-          }
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: userPrompt, max_retries: 3 })
+      });
+
+      const data = await response.json();
+
+      setMessages(prev => [...prev, {
+        role: "MACE",
+        content: {
+          code: data.generated_code,
+          feedback: data.qa_feedback,
+          document: data.documentation,
+          status: data.status,
+          retry_count: data.retry_count,
+          time_taken: data.time_taken,
+          memory_used: data.memory_used,
+          lessons_count: data.lessons_count
         }
-      ]);
+      }]);
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        role: "MACE",
+        content: {
+          code: "Error connecting to MACE backend.",
+          feedback: "Could not reach the API.",
+          document: "",
+          status: "error",
+          retry_count: 0,
+          time_taken: 0,
+          memory_used: false,
+          lessons_count: 0
+        }
+      }]);
+    } finally {
       setIsLoading(false);
-    }, 6000);
+    }
   };
 
   return (
@@ -103,15 +126,18 @@ export default function ChatPage() {
                 <div className="w-full flex flex-col gap-6">
                   <span className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-bold ml-1">MACE Analysis</span>
 
+                  {/* Code Block */}
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500/40" />
                     <div className="flex justify-between items-start mb-4">
-                      <h4 className="text-[10px] font-bold uppercase text-blue-400 tracking-widest">Code Implementation - [qwen/qwen3-32b]</h4>
+                      <h4 className="text-[10px] font-bold uppercase text-blue-400 tracking-widest">
+                        Code Implementation - [qwen/qwen3-32b]
+                      </h4>
                       <button
-                        onClick={() => handleCopy(msg.content.code)}
+                        onClick={() => handleCopy(msg.content.code, `code-${index}`)}
                         className="text-[10px] uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full hover:bg-white/10 transition-all text-gray-400 hover:text-white"
                       >
-                        {copied ? "Copied!" : "Copy"}
+                        {copied === `code-${index}` ? "Copied!" : "Copy"}
                       </button>
                     </div>
                     <pre className="text-sm text-gray-400 font-mono whitespace-pre-wrap leading-relaxed bg-black/40 p-4 rounded-xl border border-white/5">
@@ -119,33 +145,70 @@ export default function ChatPage() {
                     </pre>
                   </div>
 
+                  {/* Feedback Block */}
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500/40" />
-                    <h4 className="text-[10px] font-bold uppercase text-emerald-400 mb-4 tracking-widest">Agent Feedbacks - [llama-3.3-70b-versatile]</h4>
+                    <h4 className="text-[10px] font-bold uppercase text-emerald-400 mb-4 tracking-widest">
+                      Agent Feedbacks - [llama-3.3-70b-versatile]
+                    </h4>
                     <p className="text-sm text-gray-400 font-light leading-relaxed italic px-2">
                       {msg.content.feedback}
                     </p>
                   </div>
 
+                  {/* Documentation Block */}
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500/40" />
-
                     <div className="flex justify-between items-start mb-4">
                       <h4 className="text-[10px] font-bold uppercase text-purple-400 tracking-widest">
                         Documentation - [llama-3.3-70b-versatile]
                       </h4>
                       <button
-                        onClick={() => handleCopy(msg.content.document)}
+                        onClick={() => handleCopy(msg.content.document, `doc-${index}`)}
                         className="text-[10px] uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full hover:bg-white/10 transition-all text-gray-400 hover:text-white"
                       >
-                        {copied ? "Copied!" : "Copy"}
+                        {copied === `doc-${index}` ? "Copied!" : "Copy"}
                       </button>
                     </div>
-
-                    <p className="text-sm text-gray-400 font-light leading-relaxed px-2">
-                      {msg.content.document}
-                    </p>
+                    <div className="px-2 text-sm text-gray-400 font-light leading-relaxed
+    [&_h1]:text-purple-300 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:mb-3 [&_h1]:mt-0
+    [&_h2]:text-purple-300 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2
+    [&_h3]:text-purple-200 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1
+    [&_p]:mb-3 [&_p]:text-gray-400
+    [&_code]:text-blue-300 [&_code]:bg-black/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs
+    [&_pre]:bg-black/40 [&_pre]:border [&_pre]:border-white/5 [&_pre]:p-4 [&_pre]:rounded-xl [&_pre]:mb-3 [&_pre]:overflow-x-auto
+    [&_pre_code]:bg-transparent [&_pre_code]:p-0
+    [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3 [&_table]:text-xs
+    [&_th]:text-purple-300 [&_th]:text-left [&_th]:border [&_th]:border-white/10 [&_th]:p-2 [&_th]:bg-white/5
+    [&_td]:text-gray-400 [&_td]:border [&_td]:border-white/10 [&_td]:p-2
+    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
+    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+    [&_li]:mb-1 [&_li]:text-gray-400
+    [&_strong]:text-gray-300 [&_strong]:font-semibold
+    [&_hr]:border-white/10 [&_hr]:my-4">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content.document}</ReactMarkdown>
+                    </div>
                   </div>
+
+                  {/* Metadata Strip */}
+                  <div className="flex flex-wrap items-center gap-6 px-2">
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">
+                      {msg.content.status === "pass" ? "✅ Pass" : "❌ Failed"}
+                    </span>
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">
+                      ⏱ {msg.content.time_taken}s
+                    </span>
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">
+                      🔄 {msg.content.retry_count === 0 ? "1st Try" : `${msg.content.retry_count + 1} Attempts`}
+                    </span>
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">
+                      🧠 {msg.content.memory_used ? "Memory Used" : "Fresh Start"}
+                    </span>
+                    <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold">
+                      📚 {msg.content.lessons_count} Lessons Stored
+                    </span>
+                  </div>
+
                 </div>
               )}
             </motion.div>
@@ -176,7 +239,6 @@ export default function ChatPage() {
           )}
         </AnimatePresence>
 
-        {/* 4. The Scroll Anchor */}
         <div ref={messagesEndRef} />
       </div>
 
