@@ -52,7 +52,7 @@ export default function Hero() {
         >
           <source src="/hero-bg.mp4" type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-black/20 z-[1]" />
+        <div className="absolute inset-0 bg-black/20 z-1" />
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -62,11 +62,11 @@ export default function Hero() {
         >
           <h1 className="text-5xl md:text-7xl font-semibold tracking-tighter leading-[1.1] text-white">
             The Multi Agent approach to <br />
-            <span className="italic font-light text-white/90">Software Development Lifecycle</span>.
+            <span className="italic font-light text-white/90">Code Synthesis</span>.
           </h1>
 
           <p className="mt-8 text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed font-light">
-            MACE: A multi-agent framework using LangGraph that mimics a dev team Lead Developer, QA, Documentarian, and Orchestrator for iterative, self-improving code generation and documentation.
+            MACE: A multi-agent framework using LangGraph that mimics a dev team Lead Developer, QA and Documentarian for iterative, self-improving code generation and documentation.
           </p>
 
           <div className="mt-12 flex justify-center gap-4">
@@ -94,15 +94,14 @@ export default function Hero() {
             <h2 className="text-4xl md:text-5xl font-light italic tracking-tighter text-white">
               The Agentic Workflow
             </h2>
-            <p className="text-gray-500 mt-4 font-light">Four specialized agents, one unified goal.</p>
+            <p className="text-gray-500 mt-4 font-light">Three specialized agents, one unified goal.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { title: "Lead Dev", desc: "Architects the core logic and handles complex implementation.", icon: "💻" },
               { title: "QA Engineer", desc: "Performs automated testing and edge-case validation.", icon: "🛡️" },
               { title: "Documentarian", desc: "Ensures clear API docs and readable project guides.", icon: "📝" },
-              { title: "Orchestrator", desc: "Synchronizes agent logic and manages the feedback loop.", icon: "⚙️" }
             ].map((agent, i) => (
               <motion.div 
                 key={i}

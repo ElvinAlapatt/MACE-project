@@ -102,7 +102,7 @@ export default function ChatPage() {
         <Link href="/" className="text-xs text-gray-500 hover:text-white transition-colors tracking-widest uppercase font-medium">
           ← Back
         </Link>
-        <h1 className="text-xl font-light italic tracking-tighter uppercase">MACE</h1>
+        <h1 className="text-2xl font-light tracking-tighter uppercase">MACE</h1>
         <div className="w-10"></div>
       </header>
 
