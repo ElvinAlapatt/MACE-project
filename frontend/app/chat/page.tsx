@@ -51,7 +51,7 @@ export default function ChatPage() {
 
   const handleSend = () => {
     if (!prompt.trim() || isLoading) return;
-    
+
     const newMessages = [...messages, { role: "user", content: prompt }];
     setMessages(newMessages);
     setPrompt("");
@@ -70,7 +70,7 @@ export default function ChatPage() {
         }
       ]);
       setIsLoading(false);
-    }, 6000); 
+    }, 6000);
   };
 
   return (
@@ -102,12 +102,12 @@ export default function ChatPage() {
               ) : (
                 <div className="w-full flex flex-col gap-6">
                   <span className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-bold ml-1">MACE Analysis</span>
-                  
+
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500/40" />
                     <div className="flex justify-between items-start mb-4">
-                      <h4 className="text-[10px] font-bold uppercase text-blue-400 tracking-widest">Code Implementation</h4>
-                      <button 
+                      <h4 className="text-[10px] font-bold uppercase text-blue-400 tracking-widest">Code Implementation - [qwen/qwen3-32b]</h4>
+                      <button
                         onClick={() => handleCopy(msg.content.code)}
                         className="text-[10px] uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full hover:bg-white/10 transition-all text-gray-400 hover:text-white"
                       >
@@ -121,7 +121,7 @@ export default function ChatPage() {
 
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500/40" />
-                    <h4 className="text-[10px] font-bold uppercase text-emerald-400 mb-4 tracking-widest">Agent Feedback</h4>
+                    <h4 className="text-[10px] font-bold uppercase text-emerald-400 mb-4 tracking-widest">Agent Feedbacks - [llama-3.3-70b-versatile]</h4>
                     <p className="text-sm text-gray-400 font-light leading-relaxed italic px-2">
                       {msg.content.feedback}
                     </p>
@@ -129,7 +129,19 @@ export default function ChatPage() {
 
                   <div className="bg-[#0A0A0A] border border-white/10 p-7 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500/40" />
-                    <h4 className="text-[10px] font-bold uppercase text-purple-400 mb-4 tracking-widest">Documentation</h4>
+
+                    <div className="flex justify-between items-start mb-4">
+                      <h4 className="text-[10px] font-bold uppercase text-purple-400 tracking-widest">
+                        Documentation - [llama-3.3-70b-versatile]
+                      </h4>
+                      <button
+                        onClick={() => handleCopy(msg.content.document)}
+                        className="text-[10px] uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full hover:bg-white/10 transition-all text-gray-400 hover:text-white"
+                      >
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+
                     <p className="text-sm text-gray-400 font-light leading-relaxed px-2">
                       {msg.content.document}
                     </p>
@@ -140,7 +152,7 @@ export default function ChatPage() {
           ))}
 
           {isLoading && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="max-w-4xl mx-auto w-full"
