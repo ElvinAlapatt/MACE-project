@@ -56,7 +56,7 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generate`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: userPrompt, max_retries: 3 })
