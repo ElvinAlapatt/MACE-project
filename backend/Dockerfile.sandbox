@@ -1,0 +1,16 @@
+# Minimal, locked-down image used ONLY to execute untrusted LLM-generated code.
+# No network access is granted at runtime (network_disabled=True in sandbox.py).
+# No package installs happen here at runtime — only stdlib code should run.
+
+FROM python:3.11-slim
+
+# Non-root user — never run untrusted code as root
+RUN useradd --create-home --shell /usr/sbin/nologin sandboxuser
+
+WORKDIR /sandbox
+
+# Drop privileges
+USER sandboxuser
+
+# No CMD/ENTRYPOINT — the run command (python3 /sandbox/code.py) is
+# supplied explicitly per-container in sandbox.py via `command=`.
